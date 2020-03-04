@@ -46,9 +46,15 @@ done
 
 getfilenames() {
     for i in "${!$1[@]}"; do
-        seq_1=$(echo ${input_array[${i}]}/*R1*)
-        seq_2=$(echo ${input_array[${i}]}/*R2*)
-        input_array[${i}]=$(echo ${seq_1},${seq_2})
+        seq_1=$(echo ${$1[${i}]}/*R1*)
+        seq_2=$(echo ${$1[${i}]}/*R2*)
+        $1[${i}]=$(echo ${seq_1},${seq_2})
+    done
+}
+
+getcontignames() {
+    for i in "${!$1[@]}"; do
+        $1[${i}]=$(echo $1[${i}]"/contigs.fa")
     done
 }
 
@@ -101,3 +107,9 @@ for i in ${!input_array[@]}; do
     seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
     assembly $seq_1 $seq_2
 done
+
+# declare contig file array
+declare -a contig_array=($tmp_dir/shovill_res/*)
+getcontignames contig_array
+
+# reference sequence comparisons
