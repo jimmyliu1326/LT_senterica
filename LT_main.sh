@@ -126,25 +126,39 @@ process_ref_seq_mash() {
     source /opt/galaxy/tool_dependencies/_conda/bin/activate /home/$USER/.conda/envs/r_env
 
     # identify top hits
-    src/top_hit.R $1 > $tmp_dir/mash_res/1/process/$(basename ${1%.*})_top_ref.tsv
+    src/top_hit.R $1 > $tmp_dir/mash_res/1/process/top_hit/$(basename ${1%.*})_top_ref.tsv
 
     # identify candidates
-    src/identify_candidates.R $tmp_dir/mash_res/1/process/$(basename ${1%.*})_top_ref.tsv > $tmp_dir/mash_res/1/process/$(basename ${1%.*})_candidates_ftp_path.csv
+    src/identify_candidates.R $tmp_dir/mash_res/1/process/top_hit/$(basename ${1%.*})_top_ref.tsv > $tmp_dir/mash_res/1/process/candidates/$(basename ${1%.*})_candidates.csv
 }
 
 # identify all unique candidate genomes for download
 unique_genomes() {
-    cat $tmp_dir/mash_res/1/process/* | sort | uniq -u > $tmp_dir/candidate_genome_list.csv
+    cat $tmp_dir/mash_res/1/process/candidates/* | awk '!a[$0]++' > $tmp_dir/candidate_genome_list.csv
 }
 
 # download genomes
 download() {
-    filename=$($1 | cut -d, -f1)
-    url=$($1 | cut -d, -f2)
+    filename=$(echo $1 | cut -d, -f1)
+    url=$(echo $1 | cut -d, -f2)
     wget -nc $url -O $tmp_dir/genomes/$filename.fa
 }
 
 # candidate sequence comparisons
+candidate_mash() {
+    # declare candidate array
+    declare -a candidate_array=()
+
+    while read lines; do
+        candidate=$(echo $lines | cut -d, -f1)
+        candidate_path=$(echo $tmp_dir/genomes/${candidate}.fa)
+        candidate_array+=($candidate_path)
+    done < $1
+
+    source /opt/galaxy/tool_dependencies/_conda/bin/activate /opt/miniconda2/envs/mash-2.1
+    
+    mash sketch -p $n_threads -s 10000 -o $tmp_dir/mash_res/2/sketch/$(basename ${1%.*}).msh ${candidate_array[@]}
+}
 
 
 # MAIN
@@ -155,7 +169,8 @@ mkdir -p $tmp_dir/fastp_res
 mkdir -p $tmp_dir/shovill_res
 mkdir -p $tmp_dir/mash_res/1/sketch
 mkdir -p $tmp_dir/mash_res/1/results
-mkdir -p $tmp_dir/mash_res/1/process
+mkdir -p $tmp_dir/mash_res/1/process/top_hit
+mkdir -p $tmp_dir/mash_res/1/process/candidates
 mkdir -p $tmp_dir/mash_res/2/sketch
 mkdir -p $tmp_dir/mash_res/2/results
 mkdir -p $tmp_dir/mash_res/2/process
@@ -166,11 +181,11 @@ declare -a input_array=($IN_DIR/*)
 getreadnames ${input_array[@]}
 
 # genome assembly
-for i in ${!input_array[*]}; do
-    seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
-    seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
-    assembly $seq_1 $seq_2
-done
+# for i in ${!input_array[*]}; do
+#     seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
+#     seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
+#     assembly $seq_1 $seq_2
+# done
 
 # declare contig file array
 declare -a contig_array=($tmp_dir/shovill_res/*)
@@ -197,5 +212,15 @@ unique_genomes
 while read lines; do
     download $lines
 done < $tmp_dir/candidate_genome_list.csv
+
+# declare candidate genome array
+declare -a candidate_array=($tmp_dir/mash_res/1/process/candidates/*)
+
+# query candidate mash comparisons
+for i in ${!candidate_array[*]}; do
+    candidate_mash ${candidate_array[${i}]}
+done
+
+
 
 
