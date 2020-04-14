@@ -22,6 +22,7 @@ tmp_dir=""
 IN_DIR=""
 OUT_DIR=""
 ref_seq=""
+scheme=""
 
 # parse arguments
 if [ $# == 0 ]
@@ -30,7 +31,7 @@ then
     exit
 fi
 
-opts=`getopt -o hi:o:t:s: -l tmp:,help,input:,output:,sketch: -- "$@"`
+opts=`getopt -o hi:o:t:s:g: -l tmp:,help,input:,output:,sketch:,genes: -- "$@"`
 if [ $? != 0 ] ; then echo "WARNING: Invalid arguements used, exiting"; usage; exit 1 ; fi
 eval set -- "$opts"
 
@@ -38,6 +39,7 @@ while true; do
   case "$1" in
     -i|--input) IN_DIR=$2; shift 2 ;;
     -s|--sketch) ref_seq=$2; shift 2 ;;
+    -g|--genes) scheme=$2; shift 2 ;;
     -o|--output) OUT_DIR=$2; shift 2 ;;
     -t) n_threads=$2; shift 2 ;;
     --tmp) tmp_dir=$2; shift 2 ;;
@@ -60,18 +62,6 @@ getcontignames() {
     contig_array=($@)
     for i in ${!contig_array[*]}; do
         contig_array[${i}]=$(echo ${contig_array[${i}]},${contig_array[${i}]}"/"$(basename ${contig_array[${i}]}".fa"))
-    done
-}
-
-getfilename_single() {
-    for i in "${!$1[*]}"; do
-        $1[${i}]=$(echo $1[${i}]/*.$2)
-    done
-}
-
-getfilename_multi() {
-    for i in "${!$1[*]}"; do
-        $1[${i}]=$(echo $1[${i}]/*.$2)
     done
 }
 
@@ -112,8 +102,6 @@ assembly() {
 
 # Reference sequence comparisons using mash
 mash_exe() {
-    time=$(date +"%T")
-    echo "[$time] Reference sequence comparisons using mash..."
 
     source /opt/galaxy/tool_dependencies/_conda/bin/activate /opt/miniconda2/envs/mash-2.1
 
@@ -123,8 +111,6 @@ mash_exe() {
 
 # process reference sequence comparison mash results
 process_ref_seq_mash() {
-    time=$(date +"%T")
-    echo "[$time] Identifying top reference sequence hits..."
 
     source /opt/galaxy/tool_dependencies/_conda/bin/activate /home/$USER/.conda/envs/r_env
 
@@ -165,9 +151,6 @@ candidate_mash() {
 
 # process candidate query mash comparison results
 process_candidate_mash() {
-    
-    time=$(date +"%T")
-    echo "[$time] Identifying top candidate hits..."
 
     source /opt/galaxy/tool_dependencies/_conda/bin/activate /home/$USER/.conda/envs/r_env
 
@@ -189,23 +172,27 @@ mkdir -p $tmp_dir/mash_res/2/sketch
 mkdir -p $tmp_dir/mash_res/2/results
 mkdir -p $tmp_dir/mash_res/2/process
 mkdir -p $tmp_dir/genomes
+mkdir -p $tmp_dir/chewbbaca_res
 
 # declare input file array
 declare -a input_array=($IN_DIR/*)
 getreadnames ${input_array[@]}
 
 # genome assembly
-for i in ${!input_array[*]}; do
-    seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
-    seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
-    assembly $seq_1 $seq_2
-done
+# for i in ${!input_array[*]}; do
+#     seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
+#     seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
+#     assembly $seq_1 $seq_2
+# done
 
 # declare contig file array
 declare -a contig_array=($tmp_dir/shovill_res/*)
 getcontignames ${contig_array[@]}
 
 # reference sequence comparisons
+time=$(date +"%T")
+echo "[$time] Reference sequences to query comparisons using mash..."
+
 for i in ${!contig_array[*]}; do
     filename=$(basename $(echo ${contig_array[${i}]} | cut -d, -f1))
     filepath=$(echo ${contig_array[${i}]} | cut -d, -f2)
@@ -213,6 +200,9 @@ for i in ${!contig_array[*]}; do
 done
 
 # process reference sequence comparisons mash results
+time=$(date +"%T")
+echo "[$time] Identifying top reference sequence hits..."
+
 declare -a ref_seq_mash_array=($tmp_dir/mash_res/1/results/*)
 for i in ${!ref_seq_mash_array[*]}; do
     process_ref_seq_mash ${ref_seq_mash_array[${i}]}
@@ -220,6 +210,10 @@ done
 
 # download candidate genomes
 cat $tmp_dir/mash_res/1/process/candidates/* | awk '!a[$0]++' > $tmp_dir/candidate_genome_list.csv # identify all unique candidate genomes for download
+
+genomes_n=$(wc -l $tmp_dir/candidate_genome_list.csv | cut -f1 -d' ')
+time=$(date +"%T")
+echo "[$time] Downloading a total of $genomes_n genomes from NCBI and BIGSdb..."
 
 while read lines; do
     download $lines
@@ -229,11 +223,17 @@ done < $tmp_dir/candidate_genome_list.csv
 declare -a candidate_array=($tmp_dir/mash_res/1/process/candidates/*)
 
 # query candidate mash comparisons
+time=$(date +"%T")
+echo "[$time] Candidate sequences to query comparisons using mash..."
+
 for i in ${!candidate_array[*]}; do
     candidate_mash ${candidate_array[${i}]}
 done
 
 # find top candidate hits per query
+time=$(date +"%T")
+echo "[$time] Identifying top candidate hits..."
+
 declare -a candidate_mash_array=($tmp_dir/mash_res/2/results/*)
 for i in ${!candidate_mash_array[*]}; do
     process_candidate_mash ${candidate_mash_array[${i}]}
@@ -247,10 +247,15 @@ cat $tmp_dir/mash_res/2/process/* | awk '!a[$0]++' > $tmp_dir/filtered_candidate
 
 for i in ${!contig_array[*]}; do
     query_genome_path=$(echo ${contig_array[${i}]} | cut -d, -f2)
-    echo  $query_genome_path>> $tmp_dir/LT_genomes.txt
+    echo  $query_genome_path >> $tmp_dir/LT_genomes.txt
 done
 
 cat $tmp_dir/filtered_candidates.csv >> $tmp_dir/LT_genomes.txt
 
+# call chewBBACA for wgMLST
+time=$(date +"%T")
+echo "[$time] Allele calling..."
 
+source /opt/galaxy/tool_dependencies/_conda/bin/activate /opt/miniconda2/envs/chewbbaca-2.0.16
 
+chewBBACA.py AlleleCall -i $tmp_dir/LT_genomes.txt --cpu $n_threads --fr --ptf data/Salmonella_enterica.trn -g $scheme -o $tmp_dir/chewbbaca_res
