@@ -7,7 +7,7 @@ Usage: $0
  -i|--input     specify input directory
  -o|--output    specify output directory
  -s|--sketch    specify reference sequence mash sketch path
- -tmp           specify directory for storing temporary files
+ --tmp           specify directory for storing temporary files
  
  Options:
  -t             Number of threads [Default: 1]
@@ -59,7 +59,7 @@ getreadnames() {
 getcontignames() {
     contig_array=($@)
     for i in ${!contig_array[*]}; do
-        contig_array[${i}]=$(echo ${contig_array[${i}]},${contig_array[${i}]}"/contigs.fa")
+        contig_array[${i}]=$(echo ${contig_array[${i}]},${contig_array[${i}]}"/"$(basename ${contig_array[${i}]}".fa"))
     done
 }
 
@@ -105,12 +105,15 @@ assembly() {
           --gsize 4.5M \
           --cpus $n_threads \
           --force &>> $tmp_dir/log_files/shovill.log
+  
+  # rename shovill output
+  mv $tmp_dir/shovill_res/$filename/contigs.fa $tmp_dir/shovill_res/$filename/$filename.fa
 }
 
 # Reference sequence comparisons using mash
 mash_exe() {
     time=$(date +"%T")
-    echo "[$time] Reference sequence comparisons using mash"
+    echo "[$time] Reference sequence comparisons using mash..."
 
     source /opt/galaxy/tool_dependencies/_conda/bin/activate /opt/miniconda2/envs/mash-2.1
 
@@ -121,7 +124,7 @@ mash_exe() {
 # process reference sequence comparison mash results
 process_ref_seq_mash() {
     time=$(date +"%T")
-    echo "[$time] Processing mash results"
+    echo "[$time] Identifying top reference sequence hits..."
 
     source /opt/galaxy/tool_dependencies/_conda/bin/activate /home/$USER/.conda/envs/r_env
 
@@ -132,16 +135,11 @@ process_ref_seq_mash() {
     src/identify_candidates.R $tmp_dir/mash_res/1/process/top_hit/$(basename ${1%.*})_top_ref.tsv > $tmp_dir/mash_res/1/process/candidates/$(basename ${1%.*})_candidates.csv
 }
 
-# identify all unique candidate genomes for download
-unique_genomes() {
-    cat $tmp_dir/mash_res/1/process/candidates/* | awk '!a[$0]++' > $tmp_dir/candidate_genome_list.csv
-}
-
 # download genomes
 download() {
     filename=$(echo $1 | cut -d, -f1)
     url=$(echo $1 | cut -d, -f2)
-    wget -nc $url -O $tmp_dir/genomes/$filename.fa
+    wget -q -nc $url -O $tmp_dir/genomes/$filename.fa
 }
 
 # candidate sequence comparisons
@@ -156,10 +154,26 @@ candidate_mash() {
     done < $1
 
     source /opt/galaxy/tool_dependencies/_conda/bin/activate /opt/miniconda2/envs/mash-2.1
-    
+
+    # query name
+    query=$(echo $(basename $1) | cut -f1 -d_)
+
+    # call mash
     mash sketch -p $n_threads -s 10000 -o $tmp_dir/mash_res/2/sketch/$(basename ${1%.*}).msh ${candidate_array[@]}
+    mash dist $tmp_dir/mash_res/1/sketch/$query.msh $tmp_dir/mash_res/2/sketch/$(basename ${1%.*}).msh -p $n_threads > $tmp_dir/mash_res/2/results/$(basename ${1%.*}).tab
 }
 
+# process candidate query mash comparison results
+process_candidate_mash() {
+    
+    time=$(date +"%T")
+    echo "[$time] Identifying top candidate hits..."
+
+    source /opt/galaxy/tool_dependencies/_conda/bin/activate /home/$USER/.conda/envs/r_env
+
+    src/top_candidates.R $1 0.05 > $tmp_dir/mash_res/2/process/$(basename ${1%.*})_top.tsv
+
+}
 
 # MAIN
 
@@ -181,11 +195,11 @@ declare -a input_array=($IN_DIR/*)
 getreadnames ${input_array[@]}
 
 # genome assembly
-# for i in ${!input_array[*]}; do
-#     seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
-#     seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
-#     assembly $seq_1 $seq_2
-# done
+for i in ${!input_array[*]}; do
+    seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
+    seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
+    assembly $seq_1 $seq_2
+done
 
 # declare contig file array
 declare -a contig_array=($tmp_dir/shovill_res/*)
@@ -198,16 +212,14 @@ for i in ${!contig_array[*]}; do
     mash_exe $filename $filepath
 done
 
-# declare reference sequence mash results array
-declare -a ref_seq_mash_array=($tmp_dir/mash_res/1/results/*)
-
 # process reference sequence comparisons mash results
+declare -a ref_seq_mash_array=($tmp_dir/mash_res/1/results/*)
 for i in ${!ref_seq_mash_array[*]}; do
     process_ref_seq_mash ${ref_seq_mash_array[${i}]}
 done
 
 # download candidate genomes
-unique_genomes
+cat $tmp_dir/mash_res/1/process/candidates/* | awk '!a[$0]++' > $tmp_dir/candidate_genome_list.csv # identify all unique candidate genomes for download
 
 while read lines; do
     download $lines
@@ -221,6 +233,24 @@ for i in ${!candidate_array[*]}; do
     candidate_mash ${candidate_array[${i}]}
 done
 
+# find top candidate hits per query
+declare -a candidate_mash_array=($tmp_dir/mash_res/2/results/*)
+for i in ${!candidate_mash_array[*]}; do
+    process_candidate_mash ${candidate_mash_array[${i}]}
+done
+
+# consolidate a list of genomes for LT construction
+time=$(date +"%T")
+echo "[$time] Consolidating list of genomes for localized tree construction..."
+
+cat $tmp_dir/mash_res/2/process/* | awk '!a[$0]++' > $tmp_dir/filtered_candidates.csv
+
+for i in ${!contig_array[*]}; do
+    query_genome_path=$(echo ${contig_array[${i}]} | cut -d, -f2)
+    echo  $query_genome_path>> $tmp_dir/LT_genomes.txt
+done
+
+cat $tmp_dir/filtered_candidates.csv >> $tmp_dir/LT_genomes.txt
 
 
 
