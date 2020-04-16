@@ -3,13 +3,14 @@
 usage() { 
  echo "
 Usage: $0
- Required:
+ Required arguments:
  -i|--input     specify input directory
  -o|--output    specify output directory
  -s|--sketch    specify reference sequence mash sketch path
- --tmp           specify directory for storing temporary files
+ -g|--gene      specify chewBBACA MLST scheme path
+ --tmp          specify directory for storing temporary files
  
- Options:
+ Optional arguments:
  -t             Number of threads [Default: 1]
  -h|--help      Display help message
 
@@ -179,11 +180,11 @@ declare -a input_array=($IN_DIR/*)
 getreadnames ${input_array[@]}
 
 # genome assembly
-# for i in ${!input_array[*]}; do
-#     seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
-#     seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
-#     assembly $seq_1 $seq_2
-# done
+for i in ${!input_array[*]}; do
+    seq_1=$(echo ${input_array[${i}]} | cut -d, -f1)
+    seq_2=$(echo ${input_array[${i}]} | cut -d, -f2)
+    assembly $seq_1 $seq_2
+done
 
 # declare contig file array
 declare -a contig_array=($tmp_dir/shovill_res/*)
@@ -191,7 +192,7 @@ getcontignames ${contig_array[@]}
 
 # reference sequence comparisons
 time=$(date +"%T")
-echo "[$time] Reference sequences to query comparisons using mash..."
+echo "[$time] Query to reference sequence comparisons using mash..."
 
 for i in ${!contig_array[*]}; do
     filename=$(basename $(echo ${contig_array[${i}]} | cut -d, -f1))
@@ -224,7 +225,7 @@ declare -a candidate_array=($tmp_dir/mash_res/1/process/candidates/*)
 
 # query candidate mash comparisons
 time=$(date +"%T")
-echo "[$time] Candidate sequences to query comparisons using mash..."
+echo "[$time] Query to candidate sequence comparisons using mash..."
 
 for i in ${!candidate_array[*]}; do
     candidate_mash ${candidate_array[${i}]}
@@ -259,3 +260,15 @@ echo "[$time] Allele calling..."
 source /opt/galaxy/tool_dependencies/_conda/bin/activate /opt/miniconda2/envs/chewbbaca-2.0.16
 
 chewBBACA.py AlleleCall -i $tmp_dir/LT_genomes.txt --cpu $n_threads --fr --ptf data/Salmonella_enterica.trn -g $scheme -o $tmp_dir/chewbbaca_res
+
+## construct phylogenetic tree
+
+# calculate distance matrix
+time=$(date +"%T")
+echo "[$time] Calculating distance matrix..."
+source /opt/galaxy/tool_dependencies/_conda/bin/activate /home/$USER/.conda/envs/r_env
+src/distance.R $tmp_dir/chewbbaca_res/*/results_alleles.tsv > $tmp_dir/dist_matrix.phylip
+
+# construct tree
+source /opt/galaxy/tool_dependencies/_conda/bin/activate /home/$USER/.conda/envs/rapidnj
+rapidnj $tmp_dir/dist_matrix.phylip -c $n_threads -x $OUT_DIR/tree.nwk -i pd

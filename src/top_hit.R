@@ -12,7 +12,7 @@ top_ref <- fread(args[1], header = F) %>%
            "reference" = V2,
            "identity" = V3,
            "shared-hashes" = V4) %>%
-    arrange(desc(identity)) %>%
+    arrange(identity) %>%
     slice(1) %>%
     pull(reference)
 
