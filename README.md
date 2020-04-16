@@ -1,7 +1,7 @@
 # LT_senterica
 
 ## Description
-This pipeline uses an alignment-free similarity search algorithm (MinHash) to identify close relatives of Salmonella query sequences and subsequently construct localized phylogenetic trees based on MLST distances. The process involves comparing the query sequences to Salmonella whole genome sequences from public sequence repositories (NCBI and BIGSdb). For efficiency, the search space is significantly narrowed down by using a fixed set of reference sequences that was developed to be representative of the global Salmonella diversity.
+This pipeline uses an alignment-free similarity search algorithm (MinHash) to identify close relatives of Salmonella query sequences and subsequently construct a localized phylogenetic tree based on MLST distances. The process involves comparing the query sequences to Salmonella whole genome sequences from public sequence repositories (NCBI and BIGSdb). For efficiency, the search space is significantly narrowed down by using a fixed set of reference sequences that was developed to be representative of the global Salmonella diversity.
 
 ## Installation
 
