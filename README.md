@@ -26,8 +26,11 @@ input_sequences/
 ```
 
 ```-o --output``` Output directory that will contain the tree file in .nwk format
+
 ```-s --sketch``` Path to the Salmonella reference sequences used by Mash in .msh format
+
 ```-g --gene ```  Path to the MLST scheme required for allele calling by chewBBACA
+
 ```--tmp```       Temporary file directory
 
 __Optional arguments__
