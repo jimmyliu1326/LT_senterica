@@ -33,10 +33,12 @@ input_sequences/
 
 __Optional arguments__
 
-```-t --thread```       Number of threads used [Default: 1]
-
 ```-l --list```         List of query genome paths
 
+```-n --neighbours```   Number of neighbours to include per query [Default: 50]
+
 ```--population```      Construct the tree in the context of the entire Salmonella population structure
+
+```-t --thread```       Number of threads used [Default: 1]
 
 ```-h --help```         Display help message
