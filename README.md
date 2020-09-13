@@ -1,7 +1,7 @@
 # LT_senterica
 
 ## Description
-This pipeline uses an alignment-free similarity search algorithm (MinHash) to identify close relatives of Salmonella query sequences and subsequently construct a localized phylogenetic tree based on MLST distances. The process involves comparing the query sequences to Salmonella whole genome sequences from public sequence repositories (NCBI and BIGSdb). For efficiency, the search space is significantly narrowed down by using a fixed set of reference sequences that was developed to be representative of the global Salmonella diversity.
+This pipeline uses an alignment-free similarity search algorithm (MinHash) to identify close relatives of Salmonella query sequences and subsequently construct a localized phylogenetic tree based on SNP distances. The process involves comparing the query sequences to Salmonella whole genome sequences from public sequence repositories (NCBI and BIGSdb).
 
 ## Installation
 
@@ -25,14 +25,18 @@ input_sequences/
 2 directories, 4 files, 16-4563 and 16-4648 are two different samples
 ```
 
-```-o --output``` Output directory that will contain the tree file in .nwk format
+```-o --output```       Output directory that will contain the tree file in .nwk format
 
-```-s --sketch``` Path to the Salmonella reference sequences used by Mash in .msh format
+```-s --sketch```       Mash sketch of GenomeTrakr and PubMLST Salmonella sequences
 
-```-g --gene ```  Path to the MLST scheme required for allele calling by chewBBACA
-
-```--tmp```       Temporary file directory
+```-r --reference```    Reference Sequence for SNP tree
 
 __Optional arguments__
 
-```-t --thread``` Number of threads used.
+```-t --thread```       Number of threads used [Default: 1]
+
+```-l --list```         List of query genome paths
+
+```--population```      Construct the tree in the context of the entire Salmonella population structure
+
+```-h --help```         Display help message
