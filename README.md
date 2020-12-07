@@ -1,17 +1,18 @@
 # LT_senterica
 
 ## Description
-This pipeline uses an alignment-free similarity search algorithm (MinHash) to identify close relatives of Salmonella query sequences and subsequently construct a localized phylogenetic tree based on SNP distances. The process involves comparing the query sequences to Salmonella whole genome sequences from public sequence repositories (NCBI and BIGSdb).
+This pipeline uses a threshold-free clustering approach to rapidly identify close relatives of Salmonella query sequences from Salmonella isolates deposited in public foodborne pathogen sequence repositories (GenomeTrakr and BIGSdb) by combining an alignment-free similarity search algorithm (MinHash) and density-based hiercharchical clustering algorithm (HDBSCAN). A core genome SNP tree is subsequently constructed to visualize the evolutionary relationships between the queries and the identified query neighbours. The search will require users to first download a local copy of a reduced k-mer representation of the public Salmonella whole genome sequence databases.
 
 ## Installation
+Not yet available
 
 ## Usage
 
 __Required arguments__
 
-```-i --input``` Input directory containing raw sequence .fastq files. Each sample must be organized into a separate directory under the main input directory. The name of each sample directory will be used as sample names.
+```-i --input``` Input directory containing raw sequence .fastq files. Each sample must be organized into a separate directory under the main input directory. The name of each sample directory will be used as sample names. [Must specify either -i or -l]
 
-Example: ```LT_main.sh -i input_sequences/```
+Example: ```LTS.sh molecularlinkage -i input_sequences/```
 
 ```
 input_sequences/
@@ -25,20 +26,21 @@ input_sequences/
 2 directories, 4 files, 16-4563 and 16-4648 are two different samples
 ```
 
-```-o --output```       Output directory that will contain the tree file in .nwk format
+```-l --list```         list of query genomes, each line contains absolute path to genome assemblies. [Must specify either -i or -l]
 
-```-s --sketch```       Mash sketch of GenomeTrakr and PubMLST Salmonella sequences
-
-```-r --reference```    Reference Sequence for SNP tree
+```-o --output```       Output directory that will contain the tree file in .nwk format.
 
 __Optional arguments__
-
-```-l --list```         List of query genome paths
-
-```-n --neighbours```   Number of neighbours to include per query [Default: 50]
-
-```--population```      Construct the tree in the context of the entire Salmonella population structure
 
 ```-t --thread```       Number of threads used [Default: 1]
 
 ```-h --help```         Display help message
+
+## Dependencies
+
+* mash >= 2.1
+* R >= 3.6
+* abricate >= 1.0.1
+* shovill >= 1.1.0
+* ncbi-amrfinderplus >= 3.9.3
+* phame == 1.0.3
