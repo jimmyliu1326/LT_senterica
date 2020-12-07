@@ -32,6 +32,10 @@ input_sequences/
 
 __Optional arguments__
 
+```--notree```          Find genomic neighbours in public genome databases for each sample only, skip phlyogenetic tree construction
+
+```--noannotations```   Exclude the use of functional variations for neighbour identification, this will result in lower discriminatory power
+
 ```-t --thread```       Number of threads used [Default: 1]
 
 ```-h --help```         Display help message
